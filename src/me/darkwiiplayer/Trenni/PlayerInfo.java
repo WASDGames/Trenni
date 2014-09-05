@@ -6,17 +6,23 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.logging.Level;
 
+import org.bukkit.Material;
+import org.bukkit.Server;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
 public class PlayerInfo {
-	public UUID playerID;
-	public HashMap<String, Integer> purse = new HashMap<String, Integer>();
-	public HashMap<Integer, Integer> refundMaterials = new HashMap<Integer, Integer>();
+	private UUID playerID;
+	private HashMap<String, Integer> purse = new HashMap<String, Integer>();
+	private HashMap<String, Integer> refundMaterials = new HashMap<String, Integer>();
+	Server server = TrenniPlugin.getInstance().getServer();
 	
 	public PlayerInfo playerFromID(UUID id) {
 		PlayerInfo info = new PlayerInfo();
@@ -55,4 +61,33 @@ public class PlayerInfo {
 			return null;
 		}
 	}
+	
+	public PlayerInfo newPlayerFromID(UUID id) {
+		PlayerInfo object = playerFromID(id);
+		if (object == null) {
+			return new PlayerInfo();
+		} else {
+			return object;
+		}
+	}
+	
+	public boolean pay(UUID id, Integer amount, String coin) {
+		if (purse.get(coin) >= amount) {
+			PlayerInfo other = newPlayerFromID(id);
+			other.purse.put(coin, other.purse.get(coin) + amount);
+			purse.put(coin, purse.get(coin) - amount);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	public boolean refund() {
+		PlayerInventory inventory = server.getPlayer(playerID).getInventory();
+		for (Entry<String, Integer> entry : refundMaterials.entrySet()) {
+			inventory.addItem(new ItemStack(Material.getMaterial(entry.getKey()), entry.getValue()));
+		}
+		return true;
+	}
+	
 }
