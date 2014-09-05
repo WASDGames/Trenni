@@ -7,14 +7,22 @@ package me.darkwiiplayer.Trenni;
  * toMap() creates a HashMap that represents the coin
  */
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import org.bukkit.Material;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 public class CoinType {
-	private static HashMap<String, CoinType> coinMap = new HashMap<String, CoinType>(); //Where all the other coins are saved
+	private static HashMap<String, CoinType> coinMap; // = new HashMap<String, CoinType>(); //Where all the other coins are saved
 	
 	private String name;
 	private UUID ownerID;
@@ -22,12 +30,6 @@ public class CoinType {
 	private Material material;
 	private Double amount;
 
-	//TODO: Implement these:
-	/*		
-		public static CoinType getByName(String name);		
-		//Get- and Set-methods
-	*/
-	
 	public CoinType() {
 		resetValues();
 	}
@@ -107,5 +109,55 @@ public class CoinType {
 		map.put("licenses", licenses);
 		
 		return map;
+	}
+	
+	public static boolean reload() {
+		coinMap = new HashMap<String, CoinType>();
+		File file = new File("placeholder.yml"); //TODO: Implement dynamic file path
+		FileInputStream FStream;
+		DumperOptions options = new DumperOptions();
+	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+		Yaml yaml = new Yaml(options);
+		
+		try {
+			FStream  = new FileInputStream(file);
+			for (Object data : yaml.loadAll(FStream)) {
+				new CoinType((HashMap)data);
+			}
+			FStream.close();
+			return true;
+		} catch (FileNotFoundException e) {
+			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Could not load coin file - File not found!");
+			return false;
+		} catch (IOException e) {
+			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
+			return false;
+		}
+	}
+
+	public static boolean dump() {
+		FileWriter FWriter;
+		DumperOptions options = new DumperOptions();
+	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+		Yaml yaml = new Yaml(options);
+		File file = new File("placeholder.yml"); //TODO: Implement dynamic file path
+		
+		ArrayList<HashMap> mapList = new ArrayList<HashMap>();
+		for (CoinType coin : coinMap.values()) {
+			mapList.add(coin.toMap());
+		}
+		
+		try {
+			FWriter = new FileWriter(file);
+			
+			yaml.dumpAll(mapList.iterator(), FWriter);
+			
+			FWriter.close();
+		} catch (IOException e) {
+			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
+			return false;
+		}
+		
+		return false;
 	}
 }
