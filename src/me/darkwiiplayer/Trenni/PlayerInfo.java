@@ -3,6 +3,7 @@ package me.darkwiiplayer.Trenni;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,9 +23,10 @@ public class PlayerInfo {
 	private UUID playerID;
 	private HashMap<String, Integer> purse = new HashMap<String, Integer>();
 	private HashMap<String, Integer> refundMaterials = new HashMap<String, Integer>();
-	Server server = TrenniPlugin.getInstance().getServer();
 	
-	public PlayerInfo playerFromID(UUID id) {
+	private Server server = TrenniPlugin.getInstance().getServer();
+	
+	public static PlayerInfo playerFromID(UUID id) {
 		PlayerInfo info = new PlayerInfo();
 		File file = new File("placeholder2.txt");
 		DumperOptions options = new DumperOptions();
@@ -38,7 +40,7 @@ public class PlayerInfo {
 			for (Object data : yaml.loadAll(IStream)) {
 				if (data instanceof HashMap) {
 					HashMap map = (HashMap)data;
-					if (UUID.fromString((String)((HashMap)data).get(playerID)).equals(id)) {
+					if (UUID.fromString((String)((HashMap)data).get("playerID")).equals(id)) {
 						if ((map.get("purse") instanceof ArrayList)
 								& (map.get("refundMaterials") instanceof ArrayList)) { //Check if everything is as it shoud
 							info.playerID = id;
@@ -62,13 +64,56 @@ public class PlayerInfo {
 		}
 	}
 	
-	public PlayerInfo newPlayerFromID(UUID id) {
+	public static PlayerInfo newPlayerFromID(UUID id) {
 		PlayerInfo object = playerFromID(id);
 		if (object == null) {
 			return new PlayerInfo();
 		} else {
 			return object;
 		}
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public void save() {
+		//TODO: Implement saving!
+		DumperOptions options = new DumperOptions();
+		options.setDefaultFlowStyle(FlowStyle.BLOCK);
+		Yaml yaml = new Yaml(options);
+		FileWriter FWriter;
+		FileInputStream IStream;
+		File file = new File("placeholder2.txt");
+		HashMap<String, HashMap> objectMap = new HashMap<String, HashMap>();
+		HashMap<Object, Object> playerMap = new HashMap<Object, Object>();
+			playerMap.put("playerID", playerID);
+			playerMap.put("purse", purse);
+			playerMap.put("refundMaterials", refundMaterials);
+		
+		try {
+			IStream = new FileInputStream(file);
+			
+			for (Object data : yaml.loadAll(IStream)) {
+				if (data instanceof HashMap) {
+					if (((HashMap)data).get("playerID") instanceof String) {
+						objectMap.put((String)((HashMap)data).get("playerID"), (HashMap)data);
+					}
+				}
+			}
+			
+			objectMap.put(playerID.toString(), playerMap);
+			
+			yaml.dumpAll(objectMap.values().iterator());
+			
+			IStream.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+		}
+		
+		/* Load All
+		 * Overwrite self <- This is probably the trickiest part =/
+		 * Save All
+		 */
 	}
 	
 	public boolean pay(UUID id, Integer amount, String coin) {

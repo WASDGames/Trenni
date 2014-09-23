@@ -80,7 +80,7 @@ public class CoinType {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public boolean loadMap(HashMap<Object, Object> map) {
+	public boolean loadMap(HashMap<Object, Object> map) { //Load coin from map
 		removeList();
 		
 		//check all the values for correct types:
@@ -99,7 +99,7 @@ public class CoinType {
 		return true;
 	}
 	
-	public HashMap<String, Object> toMap() {
+	public HashMap<String, Object> toMap() { //Saves a coin to a HashMap
 		HashMap<String, Object> map = new HashMap<String, Object>();
 		
 		map.put("name", name);
@@ -111,7 +111,7 @@ public class CoinType {
 		return map;
 	}
 	
-	public static boolean reload() {
+	public static boolean reload() { //Reloads ALL coins from a file
 		coinMap = new HashMap<String, CoinType>();
 		File file = new File("placeholder.yml"); //TODO: Implement dynamic file path
 		FileInputStream FStream;
@@ -135,7 +135,7 @@ public class CoinType {
 		}
 	}
 
-	public static boolean dump() {
+	public static boolean dump() { //Dumps ALL coins into a file
 		FileWriter FWriter;
 		DumperOptions options = new DumperOptions();
 	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
