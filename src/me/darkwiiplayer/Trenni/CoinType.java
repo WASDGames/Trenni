@@ -1,4 +1,4 @@
-package me.darkwiiplayer.Trenni;
+package me.darkwiiplayer.trenni;
 
 /* Documentation:
  * addList() Adds the CoinType to the list and returnes true if another coin was overwritten and false otherwise.
@@ -37,6 +37,16 @@ public class CoinType {
 	public CoinType(HashMap map) {
 		loadMap(map);
 	}
+		
+	public CoinType(String _name, UUID _ownerID, Material _material, Double _amount) {
+		this();
+		name = _name.toLowerCase();
+		ownerID = _ownerID;
+		material = _material;
+		amount = _amount;
+		licenses = new ArrayList<String>();
+		addList();
+	}
 	
 	//========== End of Constructors =======================
 	
@@ -73,19 +83,19 @@ public class CoinType {
 	}
 	
 	public Boolean addList() { //Returns true if a coin was overwritten
-		if (coinMap.put(name, this) == null) {
+		if (coinMap.put(name.toLowerCase(), this) == null) {
 			return false;
 		}
 		return true;
 	}
 	
 	@SuppressWarnings("unchecked")
-	public boolean loadMap(HashMap<Object, Object> map) { //Load coin from map
+	public boolean loadMap(HashMap<Object, Object> map) { //Load coin from map and register to list if valid
 		removeList();
 		
 		//check all the values for correct types:
 		if (isCoinMap(map)) {
-			name = (String)map.get("name");
+			name = (String)map.get("name").toString().toLowerCase();
 			material = Material.getMaterial((String)map.get("material"));
 			amount = (Double)map.get("amount");
 			ownerID = UUID.fromString((String)map.get("ownerID"));
@@ -127,10 +137,10 @@ public class CoinType {
 			FStream.close();
 			return true;
 		} catch (FileNotFoundException e) {
-			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Could not load coin file - File not found!");
+			Trenni.getInstance().logger.log(Level.SEVERE, "Could not load coin file - File not found!");
 			return false;
 		} catch (IOException e) {
-			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
+			Trenni.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
 			return false;
 		}
 	}
@@ -154,10 +164,40 @@ public class CoinType {
 			
 			FWriter.close();
 		} catch (IOException e) {
-			TrenniPlugin.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
+			Trenni.getInstance().logger.log(Level.SEVERE, "Error loading coins: " + e.getMessage());
 			return false;
 		}
 		
 		return false;
 	}
+
+	public boolean delete() {
+		//TODO: Implement this
+		return false;
+	}
+	
+	public static boolean coinExists(String name) {
+		for (CoinType type : coinMap.values()) {
+			if (type.name.equalsIgnoreCase(name)) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	public boolean grantLicense(UUID id) {
+		licenses.add(id.toString());		
+		return true;
+	}
+	
+	public boolean revokeLicense(UUID id) { //Tries to remove a licesnse from the list and returns true if it had to be removed and false if it didn't exist anyway
+		if (licenses.contains(id.toString())) {
+			licenses.remove(id.toString());
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
 }
