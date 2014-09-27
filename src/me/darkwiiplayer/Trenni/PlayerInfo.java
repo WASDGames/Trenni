@@ -8,6 +8,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -20,11 +21,15 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
-public class PlayerInfo {
+public class PlayerInfo implements Iterable<PurseEntry> {
 	private UUID playerID;
 	private HashMap<String, Integer> purse = new HashMap<String, Integer>();
 	private HashMap<String, Integer> refundMaterials = new HashMap<String, Integer>();
-	
+		
+	private static void info(String msg) {
+		Trenni.getInstance().logger.log(Level.INFO, msg);
+	}
+		
 	private Server server = Trenni.getInstance().getServer();
 	
 	public PlayerInfo() {
@@ -45,18 +50,16 @@ public class PlayerInfo {
 		try { // Create the file of it doesn't exist yet
 			file.createNewFile();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			Trenni.getInstance().logger.log(Level.SEVERE,
-					"UUID/Join list file could not be created - Java error: "
-							+ e.getMessage());
+			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return null;
 		}
-		
+		//YAML stuff:
 		DumperOptions options = new DumperOptions();
 		options.setDefaultFlowStyle(FlowStyle.BLOCK);
 		Yaml yaml = new Yaml(options);
-		FileInputStream IStream;
 		
+		//Read the File:
+		FileInputStream IStream;
 		try {
 			IStream = new FileInputStream(file);
 			
@@ -65,23 +68,22 @@ public class PlayerInfo {
 					HashMap map = (HashMap)data;
 					if (UUID.fromString((String)((HashMap)data).get("playerID")).equals(id)) {
 						if (map.get("purse") == null) {
-							map.put("purse", new ArrayList());
+							map.put("purse", new HashMap<String, Integer>());
 						}
 						if (map.get("refundMaterials") == null) {
-							map.put("refundMaterials", new ArrayList());
+							map.put("refundMaterials", new HashMap<String, Integer>());
 						}
-						if ((map.get("purse") instanceof ArrayList)
-								& (map.get("refundMaterials") instanceof ArrayList)) { //Check if everything is as it shoud
+						if ((map.get("purse") instanceof HashMap) & (map.get("refundMaterials") instanceof HashMap)) { //Check if everything is as it shoud
 							info.playerID = id;
 							info.purse = (HashMap)map.get("purse");
 							info.refundMaterials = (HashMap)map.get("refundMaterials");
-							
+
+							IStream.close();
 							return info;
 						}
-					}
+					} 
 				}
-			}
-			
+			}			
 			IStream.close();			
 			return null;
 		} catch (FileNotFoundException e) {
@@ -98,7 +100,7 @@ public class PlayerInfo {
 		if (object == null) {
 			PlayerInfo info = new PlayerInfo();
 			info.playerID = id;
-			info.purse.put("test", 350);
+			info.setAmountOf("test", 350);
 			return info;
 		} else {
 			return object;
@@ -107,12 +109,20 @@ public class PlayerInfo {
 	
 	@SuppressWarnings("rawtypes")
 	public boolean save() {
+		Iterator<Entry<String, Integer>> iterator = purse.entrySet().iterator();
+		while (iterator.hasNext()) {
+			if (iterator.next().getValue() < 0) {
+				iterator.remove();
+			}
+		}
 		
+		/*
 		for (Entry<String, Integer> entry : purse.entrySet()) {
 			if (entry.getValue() <= 0) {
 				purse.remove(entry.getKey());
 			}
 		}
+		*/
 		
 		DumperOptions options = new DumperOptions();
 		options.setDefaultFlowStyle(FlowStyle.BLOCK);
@@ -125,9 +135,7 @@ public class PlayerInfo {
 		try { // Create the file of it doesn't exist yet
 			file.createNewFile();
 		} catch (IOException e) {
-			Trenni.getInstance().logger.log(Level.SEVERE,
-					"UUID/Join list file could not be created - Java error: "
-							+ e.getMessage());
+			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return false;
 		}
 		
@@ -136,6 +144,7 @@ public class PlayerInfo {
 			playerMap.put("playerID", playerID.toString());
 			playerMap.put("purse", purse);
 			playerMap.put("refundMaterials", refundMaterials);
+			playerMap.put("playerName", Trenni.getInstance().getServer().getOfflinePlayer(playerID).getName());
 		objectMap.put(playerID.toString(), objectMap);
 		
 		try {
@@ -170,6 +179,8 @@ public class PlayerInfo {
 			PlayerInfo other = newPlayerFromID(id);
 			other.purse.put(coin, other.purse.get(coin) + amount);
 			purse.put(coin, purse.get(coin) - amount);
+			other.save();
+			save();
 			return true;
 		} else {
 			return false;
@@ -248,6 +259,86 @@ public class PlayerInfo {
 	
 	public HashMap<String, Integer> getRefunds() {
 		return new HashMap<String, Integer>(refundMaterials);
+	}
+
+	private class PurseIterator implements Iterator<PurseEntry>{
+		private int i = 0;
+		
+		@Override
+		public boolean hasNext() {
+			return i < purse.size();
+		}
+
+		@Override
+		public PurseEntry next() {
+			i+=1;
+			return new PurseEntry((String)purse.keySet().toArray()[i-1], (int)purse.values().toArray()[i-1]);
+		}
+		
+		public void remove() {
+			purse.remove(purse.keySet().toArray()[i-1]);
+		}
+		
+	}
+	
+	@Override
+	public Iterator<PurseEntry> iterator() {
+		// TODO Auto-generated method stub
+		return new PurseIterator();
+	}
+
+	public static ArrayList<PlayerInfo> loadAllPlayers() {
+		ArrayList<PlayerInfo> list = new ArrayList<PlayerInfo>();
+		
+		File file = new File("plugins/trenni/placeholder2.yml");
+		
+		file.getParentFile().mkdirs();
+		try { // Create the file of it doesn't exist yet
+			file.createNewFile();
+		} catch (IOException e) {
+			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
+			return null;
+		}
+		//YAML stuff:
+		DumperOptions options = new DumperOptions();
+		options.setDefaultFlowStyle(FlowStyle.BLOCK);
+		Yaml yaml = new Yaml(options);
+		
+		//Read the File:
+		FileInputStream IStream;
+		try {
+			IStream = new FileInputStream(file);
+			
+			for (Object data : yaml.loadAll(IStream)) {
+				if (data instanceof HashMap) {
+					HashMap map = (HashMap)data;
+					if (map.get("purse") == null) {
+						map.put("purse", new HashMap<String, Integer>());
+					}
+					if (map.get("refundMaterials") == null) {
+						map.put("refundMaterials", new HashMap<String, Integer>());
+					}
+					if ((map.get("purse") instanceof HashMap) & (map.get("refundMaterials") instanceof HashMap)) { //Check if everything is as it shoud
+						PlayerInfo info = new PlayerInfo();
+						info.playerID = UUID.fromString(((HashMap)map).get("playerID").toString());
+						info.purse = (HashMap)map.get("purse");
+						info.refundMaterials = (HashMap)map.get("refundMaterials");
+
+						list.add(info);
+					}
+				}
+			}			
+			IStream.close();		
+			
+		} catch (FileNotFoundException e) {
+			Trenni.getInstance().logger.log(Level.SEVERE, "[TRENNI] Error loading player list! Player file not found.");
+			return null;
+		} catch (IOException e) {
+			Trenni.getInstance().logger.log(Level.SEVERE, "[TRENNI] Error loading player list!");
+			return null;
+		}
+		
+		return list;
 	}
 	
 }

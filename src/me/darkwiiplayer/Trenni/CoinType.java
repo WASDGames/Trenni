@@ -14,6 +14,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -22,13 +23,15 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 public class CoinType {
-	private static HashMap<String, CoinType> coinMap; // = new HashMap<String, CoinType>(); //Where all the other coins are saved
+	public static HashMap<String, CoinType> coinMap = new HashMap<String, CoinType>(); // = new HashMap<String, CoinType>(); //Where all the other coins are saved
+	//FIXME: Change back to private!!!
 	
 	private String name;
 	private UUID ownerID;
 	private ArrayList<String> licenses;
 	private Material material;
 	private Double amount;
+	
 
 	public CoinType() {
 		resetValues();
@@ -37,7 +40,7 @@ public class CoinType {
 	public CoinType(HashMap map) {
 		loadMap(map);
 	}
-		
+	
 	public CoinType(String _name, UUID _ownerID, Material _material, Double _amount) {
 		this();
 		name = _name.toLowerCase();
@@ -51,6 +54,7 @@ public class CoinType {
 	//========== End of Constructors =======================
 	
 	private void resetValues() {
+		removeList();
 		ownerID = null;
 		name = "";
 		licenses = new ArrayList();
@@ -94,6 +98,9 @@ public class CoinType {
 		removeList();
 		
 		//check all the values for correct types:
+		if (licenses == null) {
+			licenses = new ArrayList<String>();
+		}
 		if (isCoinMap(map)) {
 			name = (String)map.get("name").toString().toLowerCase();
 			material = Material.getMaterial((String)map.get("material"));
@@ -123,11 +130,19 @@ public class CoinType {
 	
 	public static boolean reload() { //Reloads ALL coins from a file
 		coinMap = new HashMap<String, CoinType>();
-		File file = new File("placeholder.yml"); //TODO: Implement dynamic file path
+		File file = new File("plugins/trenni/placeholder.yml"); //TODO: Implement dynamic file path
 		FileInputStream FStream;
 		DumperOptions options = new DumperOptions();
 	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 		Yaml yaml = new Yaml(options);
+		
+		file.getParentFile().mkdirs();
+		try { // Create the file of it doesn't exist yet
+			file.createNewFile();
+		} catch (IOException e) { //TODO: Change error message!
+			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
+			return false;
+		}
 		
 		try {
 			FStream  = new FileInputStream(file);
@@ -150,7 +165,15 @@ public class CoinType {
 		DumperOptions options = new DumperOptions();
 	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 		Yaml yaml = new Yaml(options);
-		File file = new File("placeholder.yml"); //TODO: Implement dynamic file path
+		File file = new File("plugins/trenni/placeholder.yml"); //TODO: Implement dynamic file path
+		
+		file.getParentFile().mkdirs();
+		try { // Create the file of it doesn't exist yet
+			file.createNewFile();
+		} catch (IOException e) { //TODO: Change error message!
+			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
+			return false;
+		}
 		
 		ArrayList<HashMap> mapList = new ArrayList<HashMap>();
 		for (CoinType coin : coinMap.values()) {
@@ -181,8 +204,7 @@ public class CoinType {
 			if (type.name.equalsIgnoreCase(name)) {
 				return true;
 			}
-		}
-		
+		}		
 		return false;
 	}
 	
@@ -198,6 +220,54 @@ public class CoinType {
 		} else {
 			return false;
 		}
+	}
+	
+	public int totalAmount() {
+		ArrayList<PlayerInfo> list = PlayerInfo.loadAllPlayers();
+		int amount = 0;
+		
+		for (PlayerInfo info : list) {
+			amount  += info.amountOf(name);
+		}
+		
+		return amount;
+	}
+	
+	public String formattedInfo() {
+		return "Coin information for: " + name 
+				+ "\nOwner: " + Trenni.getInstance().getServer().getOfflinePlayer(ownerID).getName()
+				+ "\nOwner ID: " + ownerID
+				+ "\nMaterial: " + amount + " of " + material + " in each coin"
+				+ "\nTotal amount: " + totalAmount();
+	}
+	
+	public static CoinType getCoin(String name) {
+		return coinMap.get(name.toLowerCase());
+	}
+	
+	private static class CoinIterator implements Iterator<Object>{
+		int i = -1;
+		
+		@Override
+		public boolean hasNext() {
+			return i < coinMap.size()-1;
+		}
+
+		@Override
+		public Object next() {
+			i+=1;
+			return coinMap.values().toArray()[i];
+		}
+		
+		public void remove() {
+			if (i >= 1) {
+				coinMap.remove(coinMap.keySet().toArray()[i]);
+			}
+		}
+	}
+	
+	public static CoinIterator iterator() {
+		return new CoinIterator();
 	}
 	
 }

@@ -15,22 +15,28 @@ public class Trenni extends JavaPlugin implements Listener {
 	
 	public final Logger logger = Logger.getLogger("minecraft");
 	private static Trenni instance;
+	private TrenniCommandExecutor commandExecutor;
 	
 	public static Trenni getInstance() {
 		return instance;
 	}
 	
 	@Override
-	public void onEnable() {
+	public void onEnable() {		
+		CoinType.reload();
+		
 		if (!CoinType.coinExists("test")) {
 			new CoinType("test", UUID.randomUUID(), Material.GOLD_INGOT, 0.1);
 		}
-		
-		logger.log(Level.INFO, "Trenni has been loaded! :)");
-		CoinType.reload();
 
 		getServer().getPluginManager().registerEvents(this, this);
 		instance = this;
+		
+		commandExecutor = new TrenniCommandExecutor(this);
+		
+		this.getCommand("trenni").setExecutor(commandExecutor);
+		
+		logger.log(Level.INFO, "Trenni has been loaded! :)");
 	}
 	
 	@Override

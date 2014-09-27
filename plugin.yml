@@ -1,3 +1,7 @@
 name: Trenni
-main: me.darkwiiplayer.Trenni.Trenni
+main: me.darkwiiplayer.trenni.Trenni
 version: 0.2
+commands:
+  trenni:
+      description: This is a demo command.
+      usage: /trenni help | <command>
