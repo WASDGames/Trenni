@@ -22,9 +22,10 @@ import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
 public class PlayerInfo implements Iterable<PurseEntry> {
+	private static File saveFile = new File("plugins/trenni/players.yml");
 	private UUID playerID;
 	private HashMap<String, Integer> purse = new HashMap<String, Integer>();
-	private HashMap<String, Integer> refundMaterials = new HashMap<String, Integer>();
+	private HashMap<String, Float> refundMaterials = new HashMap<String, Float>();
 		
 	private static void info(String msg) {
 		Trenni.getInstance().logger.log(Level.INFO, msg);
@@ -42,13 +43,21 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		refundMaterials = new HashMap(source.refundMaterials);
 	}
 	
+	private void removeUnexistentCoins() {
+		Iterator<PurseEntry> i = iterator();
+		while (i.hasNext()) {
+			if (!CoinType.coinExists(i.next().getName())) {
+				i.remove();
+			}
+		}
+	}
+	
 	public static PlayerInfo playerFromID(UUID id) {
 		PlayerInfo info = new PlayerInfo();
-		File file = new File("plugins/trenni/placeholder2.yml");
 		
-		file.getParentFile().mkdirs();
+		saveFile.getParentFile().mkdirs();
 		try { // Create the file of it doesn't exist yet
-			file.createNewFile();
+			saveFile.createNewFile();
 		} catch (IOException e) {
 			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return null;
@@ -61,11 +70,14 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		//Read the File:
 		FileInputStream IStream;
 		try {
-			IStream = new FileInputStream(file);
+			IStream = new FileInputStream(saveFile);
 			
 			for (Object data : yaml.loadAll(IStream)) {
 				if (data instanceof HashMap) {
 					HashMap map = (HashMap)data;
+					if (map.get("playerID") == null) {
+						continue;
+					}
 					if (UUID.fromString((String)((HashMap)data).get("playerID")).equals(id)) {
 						if (map.get("purse") == null) {
 							map.put("purse", new HashMap<String, Integer>());
@@ -79,6 +91,7 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 							info.refundMaterials = (HashMap)map.get("refundMaterials");
 
 							IStream.close();
+							info.removeUnexistentCoins();
 							return info;
 						}
 					} 
@@ -129,11 +142,10 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		Yaml yaml = new Yaml(options);
 		FileWriter FWriter;
 		FileInputStream IStream;
-		File file = new File("plugins/trenni/placeholder2.yml");
 		
-		file.getParentFile().mkdirs();
+		saveFile.getParentFile().mkdirs();
 		try { // Create the file of it doesn't exist yet
-			file.createNewFile();
+			saveFile.createNewFile();
 		} catch (IOException e) {
 			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return false;
@@ -148,7 +160,7 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		objectMap.put(playerID.toString(), objectMap);
 		
 		try {
-			IStream = new FileInputStream(file);
+			IStream = new FileInputStream(saveFile);
 			
 			for (Object data : yaml.loadAll(IStream)) {
 				if (data instanceof HashMap) {
@@ -160,7 +172,7 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 			IStream.close();			
 			objectMap.put(playerID.toString(), playerMap);
 			
-			FWriter = new FileWriter(file);
+			FWriter = new FileWriter(saveFile);
 			
 			yaml.dumpAll(objectMap.values().iterator(), FWriter);
 			FWriter.close();
@@ -175,10 +187,10 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 	}
 	
 	public boolean pay(UUID id, Integer amount, String coin) {
-		if (purse.get(coin) >= amount) {
+		if (amountOf(coin) >= amount) {
 			PlayerInfo other = newPlayerFromID(id);
-			other.purse.put(coin, other.purse.get(coin) + amount);
-			purse.put(coin, purse.get(coin) - amount);
+			other.add(coin, amount);
+			remove(coin, amount);
 			other.save();
 			save();
 			return true;
@@ -187,7 +199,7 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		}
 	}
 
-	public boolean remove(String coin, int amount) {
+	public boolean remove(String coin, int amount) { //tries to remove <amount> coins and returns true if successfull. Doesn't remove anything if not enough coins.
 		if (!CoinType.coinExists(coin)) {
 			return false;
 		}
@@ -208,9 +220,9 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 			setAmountOf(coin, amountOf(coin) - amount);
 			return amount;
 		} else {
-			int dif = amount - amountOf(coin);
+			int removed = amountOf(coin);
 			setAmountOf(coin, 0);
-			return dif;
+			return removed;
 		}
 	}
 	
@@ -237,8 +249,9 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 	
 	public boolean refund() {
 		PlayerInventory inventory = server.getPlayer(playerID).getInventory();
-		for (Entry<String, Integer> entry : refundMaterials.entrySet()) {
-			inventory.addItem(new ItemStack(Material.getMaterial(entry.getKey()), entry.getValue()));
+		for (Entry<String, Float> entry : refundMaterials.entrySet()) {
+			inventory.addItem(new ItemStack(Material.getMaterial(entry.getKey()), (int)Math.round(Math.floor(entry.getValue()))));
+			refundMaterials.put(entry.getKey(), entry.getValue() - (int)Math.round(Math.floor(entry.getValue())));
 		}
 		return true;
 	}
@@ -257,10 +270,23 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		return new HashMap<String, Integer>(purse);
 	}	
 	
-	public HashMap<String, Integer> getRefunds() {
-		return new HashMap<String, Integer>(refundMaterials);
+	public HashMap<String, Float> getRefunds() {
+		return new HashMap<String, Float>(refundMaterials);
 	}
 
+	public boolean add(String coin, int amount) {
+		if (CoinType.coinExists(coin)) {
+			if (amountOf(coin) > 0) {
+				purse.put(coin, purse.get(coin) + amount);
+			} else {
+				purse.put(coin, amount);
+			}
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
 	private class PurseIterator implements Iterator<PurseEntry>{
 		private int i = 0;
 		
@@ -290,11 +316,9 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 	public static ArrayList<PlayerInfo> loadAllPlayers() {
 		ArrayList<PlayerInfo> list = new ArrayList<PlayerInfo>();
 		
-		File file = new File("plugins/trenni/placeholder2.yml");
-		
-		file.getParentFile().mkdirs();
+		saveFile.getParentFile().mkdirs();
 		try { // Create the file of it doesn't exist yet
-			file.createNewFile();
+			saveFile.createNewFile();
 		} catch (IOException e) {
 			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return null;
@@ -307,7 +331,7 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		//Read the File:
 		FileInputStream IStream;
 		try {
-			IStream = new FileInputStream(file);
+			IStream = new FileInputStream(saveFile);
 			
 			for (Object data : yaml.loadAll(IStream)) {
 				if (data instanceof HashMap) {
@@ -340,5 +364,5 @@ public class PlayerInfo implements Iterable<PurseEntry> {
 		
 		return list;
 	}
-	
+		
 }

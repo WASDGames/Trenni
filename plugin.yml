@@ -1,7 +1,26 @@
 name: Trenni
 main: me.darkwiiplayer.trenni.Trenni
-version: 0.2
+version: 0.3
 commands:
   trenni:
       description: This is a demo command.
       usage: /trenni help | <command>
+permissions:
+  trenni.ignoreblacklist:
+    description: Allows to ignore blacklisted materials when creating coins
+    default: false
+  trenni.create.single:
+    description: Allows to create a single currency
+    default: false
+  trenni.create.options:
+    description: Allows to create as many currencies as defined in the options
+    default: false
+  trenni.create.infinite:
+    description: Allows you to create infinite currencies
+    default: false
+  trenni.admin.*:
+    children:
+      trenni.admin.create: true
+  trenni.admin.create:
+    description: Allows users to create coins they don't own or have a license for
+    default: false

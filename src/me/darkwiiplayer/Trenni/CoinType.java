@@ -19,18 +19,20 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 public class CoinType {
 	public static HashMap<String, CoinType> coinMap = new HashMap<String, CoinType>(); // = new HashMap<String, CoinType>(); //Where all the other coins are saved
+	private static File saveFile = new File("plugins/trenni/coins.yml");
 	//FIXME: Change back to private!!!
 	
 	private String name;
 	private UUID ownerID;
 	private ArrayList<String> licenses;
 	private Material material;
-	private Double amount;
+	private int amount;
 	
 
 	public CoinType() {
@@ -41,12 +43,16 @@ public class CoinType {
 		loadMap(map);
 	}
 	
-	public CoinType(String _name, UUID _ownerID, Material _material, Double _amount) {
+	public CoinType(String _name, UUID _ownerID, Material _material, int _amount) {
 		this();
 		name = _name.toLowerCase();
 		ownerID = _ownerID;
 		material = _material;
-		amount = _amount;
+		if (_amount > 0) {
+			amount = _amount;
+		} else {
+			amount = 1;
+		}
 		licenses = new ArrayList<String>();
 		addList();
 	}
@@ -59,13 +65,13 @@ public class CoinType {
 		name = "";
 		licenses = new ArrayList();
 		material = Material.AIR;
-		amount = 1.0;
+		amount = 1;
 	}
 	
 	private boolean isCoinMap(HashMap map) {
 		if (! (map.get("name") instanceof String)) { return false; }
 		if (! (map.get("material") instanceof String)) { return false; }
-		if (! ((map.get("amount") instanceof Double) | (map.get("amount") instanceof Float))) { return false; }
+		if (! (map.get("amount") instanceof Integer)) { return false; }
 		if (! (map.get("ownerID") instanceof String)) { return false; }
 		if (UUID.fromString((String)map.get("ownerID")) == null) { return false; }
 		ArrayList<Object> _licenses;
@@ -104,7 +110,7 @@ public class CoinType {
 		if (isCoinMap(map)) {
 			name = (String)map.get("name").toString().toLowerCase();
 			material = Material.getMaterial((String)map.get("material"));
-			amount = (Double)map.get("amount");
+			amount = (int)map.get("amount");
 			ownerID = UUID.fromString((String)map.get("ownerID"));
 			licenses = (ArrayList<String>)map.get("licenses");
 		} else {
@@ -130,22 +136,21 @@ public class CoinType {
 	
 	public static boolean reload() { //Reloads ALL coins from a file
 		coinMap = new HashMap<String, CoinType>();
-		File file = new File("plugins/trenni/placeholder.yml"); //TODO: Implement dynamic file path
 		FileInputStream FStream;
 		DumperOptions options = new DumperOptions();
 	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 		Yaml yaml = new Yaml(options);
 		
-		file.getParentFile().mkdirs();
+		saveFile.getParentFile().mkdirs();
 		try { // Create the file of it doesn't exist yet
-			file.createNewFile();
+			saveFile.createNewFile();
 		} catch (IOException e) { //TODO: Change error message!
 			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return false;
 		}
 		
 		try {
-			FStream  = new FileInputStream(file);
+			FStream  = new FileInputStream(saveFile);
 			for (Object data : yaml.loadAll(FStream)) {
 				new CoinType((HashMap)data);
 			}
@@ -165,11 +170,10 @@ public class CoinType {
 		DumperOptions options = new DumperOptions();
 	    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 		Yaml yaml = new Yaml(options);
-		File file = new File("plugins/trenni/placeholder.yml"); //TODO: Implement dynamic file path
 		
-		file.getParentFile().mkdirs();
+		saveFile.getParentFile().mkdirs();
 		try { // Create the file of it doesn't exist yet
-			file.createNewFile();
+			saveFile.createNewFile();
 		} catch (IOException e) { //TODO: Change error message!
 			Trenni.getInstance().logger.log(Level.SEVERE, "UUID/Join list file could not be created - Java error: " + e.getMessage());
 			return false;
@@ -181,7 +185,7 @@ public class CoinType {
 		}
 		
 		try {
-			FWriter = new FileWriter(file);
+			FWriter = new FileWriter(saveFile);
 			
 			yaml.dumpAll(mapList.iterator(), FWriter);
 			
@@ -237,7 +241,7 @@ public class CoinType {
 		return "Coin information for: " + name 
 				+ "\nOwner: " + Trenni.getInstance().getServer().getOfflinePlayer(ownerID).getName()
 				+ "\nOwner ID: " + ownerID
-				+ "\nMaterial: " + amount + " of " + material + " in each coin"
+				+ "\nMaterial: " + 1.0/(float)amount + " of " + material + " in each coin"
 				+ "\nTotal amount: " + totalAmount();
 	}
 	
@@ -270,4 +274,79 @@ public class CoinType {
 		return new CoinIterator();
 	}
 	
+	public Material getMaterial() {
+		return material;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public int howMany(int number) { //How many coins do I get with <number> amount of <material>?
+		return amount * number;
+	}
+	
+	public boolean hasLicense(Player player) {
+		if (ownerID.equals(player.getUniqueId()) | licenses.contains(player.getUniqueId())) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	public boolean isOwner(Player player) {
+		if (ownerID.equals(player.getUniqueId())) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	public static int ownedCoinsCount(Player player) {
+		int count = 0;
+		for (CoinType coin : coinMap.values()) {
+			if (coin.isOwner(player)) {
+				count += 1;
+			}
+		}
+		return count;
+	}
+	
+	public static HashMap<String, CoinType> ownedCoins(Player player) {
+		HashMap<String, CoinType> map = new HashMap<String, CoinType>();
+		for (CoinType coin : coinMap.values()) {
+			if (coin.isOwner(player)) {
+				map.put(coin.name, coin);
+			}
+		}
+		return map;
+	}
+	
+	public static int managedCoinsCount(Player player) {
+		int count = 0;
+		for (CoinType coin : coinMap.values()) {
+			if (coin.hasLicense(player)) {
+				count += 1;
+			}
+		}
+		return count;
+	}
+	
+	public static HashMap<String, CoinType> managedCoins(Player player) {
+		HashMap<String, CoinType> map = new HashMap<String, CoinType>();
+		for (CoinType coin : coinMap.values()) {
+			if (coin.hasLicense(player)) {
+				map.put(coin.name, coin);
+			}
+		}
+		return map;
+	}
+	
+	public void grant(Player player) {
+		licenses.add(player.getUniqueId().toString());
+	}
+	
+	public void revoke(Player player) {
+		licenses.remove(player.getUniqueId().toString());
+	}
 }
